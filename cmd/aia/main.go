@@ -36,6 +36,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("DB connect failed: %v", err)
 	}
+
+	database := client.Database(os.Getenv("MONGO_DATABASE"))
+
 	defer func() {
 		if err = client.Disconnect(ctx); err != nil {
 			log.Fatalf("DB disconnect failed: %v", err)
@@ -43,5 +46,7 @@ func main() {
 	}()
 
 	// console run
-	console.Run()
+	if err = console.Run(database); err != nil {
+		log.Fatalf("Run error: %v", err)
+	}
 }

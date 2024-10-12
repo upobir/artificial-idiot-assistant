@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func Run() {
+func Run(database *mongo.Database) error {
 	reader := bufio.NewReader(os.Stdin)
 
 	for {
@@ -23,4 +25,6 @@ func Run() {
 		fmt.Printf("aia > %s\n", input)
 		fmt.Println()
 	}
+
+	return nil
 }
