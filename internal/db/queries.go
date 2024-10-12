@@ -49,7 +49,7 @@ func UpdateTask(database *mongo.Database, task task.Task) (task.Task, error) {
 		"$set": bson.M{
 			"name":  task.Name,
 			"state": task.State,
-			"tags":  task.Tags,
+			// "tags":  task.Tags,
 		},
 	}
 

@@ -16,12 +16,12 @@ type Conversation struct {
 	Stream            bool      `json:"stream"`
 }
 
-func NewConversation(model string, stream bool) Conversation {
-	return Conversation{
+func NewConversation(model string, stream bool) *Conversation {
+	return &Conversation{
 		Model:             model,
 		Messages:          []Message{},
 		RepetitionPenalty: 1.1,
-		Temperature:       0.8,
+		Temperature:       0.5,
 		TopP:              0.9,
 		TopK:              40,
 		MaxTokens:         200,

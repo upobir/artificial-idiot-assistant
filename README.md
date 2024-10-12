@@ -19,6 +19,8 @@ volumes:
 ```
 and run `docker compose up`
 
+### Env variables
+fill up a `.env` following `.env.example`. I used arliai, cause it's free, but also freaking slow.
 
 ### Run
 Run with 
@@ -31,4 +33,4 @@ Build with
 ```bash
 go build -o ./build ./cmd/aia
 ```
-Binary will be built at `build` folder
+Binary will be built at `build` folder.
