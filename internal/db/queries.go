@@ -10,8 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+const TASK_COLLECTION_NAME = "tasks"
+
 func GetAllTasks(database *mongo.Database) ([]task.Task, error) {
-	collection := database.Collection("tasks")
+	collection := database.Collection(TASK_COLLECTION_NAME)
 	var tasks []task.Task
 	cursor, err := collection.Find(context.TODO(), bson.D{})
 	if err != nil {
@@ -24,7 +26,7 @@ func GetAllTasks(database *mongo.Database) ([]task.Task, error) {
 }
 
 func InsertTask(database *mongo.Database, task task.Task) (task.Task, error) {
-	collection := database.Collection("tasks")
+	collection := database.Collection(TASK_COLLECTION_NAME)
 
 	nextID, err := GetNextTaskId(database)
 	if err != nil {
@@ -40,7 +42,7 @@ func InsertTask(database *mongo.Database, task task.Task) (task.Task, error) {
 }
 
 func UpdateTask(database *mongo.Database, task task.Task) (task.Task, error) {
-	collection := database.Collection("tasks")
+	collection := database.Collection(TASK_COLLECTION_NAME)
 
 	filter := bson.M{"id": task.ID}
 	update := bson.M{
@@ -59,4 +61,20 @@ func UpdateTask(database *mongo.Database, task task.Task) (task.Task, error) {
 		return task, errors.New("no task found with the given id")
 	}
 	return task, nil
+}
+
+func DeleteTask(database *mongo.Database, id int) error {
+	collection := database.Collection(TASK_COLLECTION_NAME)
+
+	filter := bson.M{"id": id}
+	result, err := collection.DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return err
+	}
+
+	if result.DeletedCount == 0 {
+		return errors.New("no task found with the given id")
+	}
+
+	return nil
 }
