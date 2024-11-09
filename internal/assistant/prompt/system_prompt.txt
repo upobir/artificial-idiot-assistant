@@ -14,6 +14,7 @@ do an action or get data, process the service responses, then answer the user.
 - Do not tell user to wait while you get/process data, first do the processing/getting, then inform user. 
 - messages sent to service must be exact according to the message format provided below, nothing more or less. Do not make Any spelling 
   mistakes
+- You response should not contain the word "TO-UESR"
 </Strict-Rules>
 
 <Service>
