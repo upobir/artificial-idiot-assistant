@@ -11,62 +11,115 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type assistant struct {
-	Conversation *ai.Conversation
+type Assistant struct {
+	aiApi        ai.AiApi
+	database     *mongo.Database
+	conversation *ai.Conversation
 }
 
-func NewAssistant(model string, stream bool) (*assistant, error) {
+func NewAssistant(aiApi ai.AiApi, database *mongo.Database) (*Assistant, error) {
+
+	prompt, err := loadPrompt()
+	if err != nil {
+		return nil, err
+	}
+
+	assistant := &Assistant{
+		// Conversation: ai.NewConversation("Mistral-Nemo-12B-Instruct-2407", false),
+		aiApi:        aiApi,
+		database:     database,
+		conversation: ai.NewConversation(),
+	}
+
+	assistant.conversation.AddMessage(ai.System, prompt)
+
+	return assistant, nil
+}
+
+func loadPrompt() (string, error) {
 	promptPath := filepath.Join(os.Getenv("SYSTEM_PROMPT_PATH"), "system_prompt.txt")
 	file, err := os.Open(promptPath)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 	defer file.Close()
 
 	content, err := io.ReadAll(file)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	assistant := &assistant{
-		Conversation: ai.NewConversation("Mistral-Nemo-12B-Instruct-2407", false),
-	}
-	assistant.Conversation.AddLocalMessage("system", string(content))
-
-	return assistant, nil
+	return string(content), nil
 }
 
-func (assistant *assistant) AddUserMessage(message string) {
-	assistant.Conversation.AddLocalMessage("user", "FROM-USER: "+message)
+func (assistant *Assistant) AddUserMessage(message string) {
+	assistant.conversation.AddMessage(ai.User, "FROM-USER: "+message)
 }
 
-func (assistant *assistant) FetchAssistantMessage(arliai *ai.Arliai, database *mongo.Database) (string, error) {
-	for {
-		msg, err := assistant.Conversation.FetchAssistantMessage(arliai, true)
-		if err != nil {
-			return "", err
-		}
-		if msg.Role != "assistant" {
-			return "", fmt.Errorf("unknown role: %s", msg.Role)
-		}
+type ResponseKind int
 
-		if strings.HasPrefix(msg.Content, "TO-USER:") {
-			return strings.TrimSpace(strings.TrimPrefix(msg.Content, "TO-USER:")), nil
-		} else if strings.HasPrefix(msg.Content, "TO-SERVICE:") {
-			response, err := assistant.handleFunctionCall(database, msg.Content)
-			if err != nil {
-				return "", err
+const (
+	Action ResponseKind = iota
+	MessagePart
+	Unknown
+)
+
+type ResponsePart struct {
+	Kind    ResponseKind
+	Content string
+	Err     error
+}
+
+func (assistant *Assistant) FetchAssistantMessage() <-chan ResponsePart {
+	ch := make(chan ResponsePart)
+	go func() {
+		defer close(ch)
+		for {
+			var builder strings.Builder
+			kind := Unknown
+			for part := range assistant.aiApi.ChatComplete(assistant.conversation) {
+				if part.Err != nil {
+					ch <- ResponsePart{Kind: Unknown, Content: "", Err: part.Err}
+					return
+				}
+
+				builder.WriteString(part.Value)
+
+				if kind == Unknown {
+					message := builder.String()
+					if strings.HasPrefix(message, "TO-USER: ") {
+						kind = MessagePart
+						content := strings.TrimPrefix(message, "TO-USER: ")
+						ch <- ResponsePart{Kind: kind, Content: content, Err: nil}
+					} else if strings.HasPrefix(message, "TO-SERVICE: ") {
+						kind = Action
+						ch <- ResponsePart{Kind: kind, Content: "Working...", Err: nil}
+					}
+				} else if kind == MessagePart {
+					ch <- ResponsePart{Kind: kind, Content: part.Value, Err: nil}
+				} else if kind == Action {
+				}
 			}
-			assistant.Conversation.AddLocalMessage("user", "FROM-SERICE: "+response)
-		} else {
-			return "", fmt.Errorf("bad format response: %v", msg.Content)
+
+			if kind == Unknown {
+				ch <- ResponsePart{Kind: Unknown, Content: "", Err: fmt.Errorf("failed to parse: %v", builder.String())}
+				return
+			} else if kind == Action {
+				response, err := assistant.handleFunctionCall(strings.TrimSpace(strings.TrimPrefix(builder.String(), "TO-SERVICE: ")))
+				if err != nil {
+					ch <- ResponsePart{Kind: Unknown, Content: "", Err: err}
+					return
+				}
+				assistant.conversation.AddMessage(ai.User, "FROM-SERVICE: "+response)
+			} else {
+				return
+			}
 		}
-	}
+	}()
+	return ch
 }
 
-func (assistant *assistant) handleFunctionCall(database *mongo.Database, message string) (string, error) {
-	// log.Println(message)
-	functionCall := strings.TrimSpace(strings.TrimPrefix(message, "TO-SERVICE:"))
+func (assistant *Assistant) handleFunctionCall(functionCall string) (string, error) {
 	spaceInd := strings.Index(functionCall, " ")
 	arguments := ""
 	if spaceInd != -1 {
@@ -81,7 +134,7 @@ func (assistant *assistant) handleFunctionCall(database *mongo.Database, message
 		return "", fmt.Errorf("unknown function: %s", functionCall)
 	}
 
-	response, err := handler(database, arguments)
+	response, err := handler(assistant.database, arguments)
 	if err != nil {
 		return "", err
 	}

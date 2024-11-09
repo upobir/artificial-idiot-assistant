@@ -8,25 +8,57 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/upobir/artificial-idiot-assistant/internal/ai"
+	"github.com/upobir/artificial-idiot-assistant/internal/assistant"
 	"github.com/upobir/artificial-idiot-assistant/internal/console"
 	"github.com/upobir/artificial-idiot-assistant/internal/db"
 	"github.com/upobir/artificial-idiot-assistant/internal/utils"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func main() {
-	// log setup
-	utils.InitializeLog()
+	initializeLogs()
 
-	// env setup
+	initializeEnv()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	client, database := initializeMongo(ctx)
+	defer client.Disconnect(ctx)
+
+	aiApi := initializeAiApi()
+
+	assistant := initializeAssistant(aiApi, database)
+
+	if err := console.Run(assistant); err != nil {
+		log.Fatalf("Run error: %v", err)
+	}
+}
+
+func initializeAssistant(aiApi ai.AiApi, database *mongo.Database) *assistant.Assistant {
+	assistant, err := assistant.NewAssistant(aiApi, database)
+	if err != nil {
+		log.Fatalf("Error creating assistant: %v\n", err)
+	}
+	return assistant
+}
+
+func initializeAiApi() ai.AiApi {
+	return ai.InitializeFakeApi(true, 100*time.Millisecond)
+}
+
+func initializeEnv() {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatalf("Error loading .env file: %v\n", err)
 	}
+}
 
-	// mongo setup
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func initializeLogs() {
+	utils.InitializeLog()
+}
 
+func initializeMongo(ctx context.Context) (*mongo.Client, *mongo.Database) {
 	dbConfig := db.MongoConfig{
 		Username: os.Getenv("MONGO_USERNAME"),
 		Password: os.Getenv("MONGO_PASSWORD"),
@@ -40,17 +72,5 @@ func main() {
 
 	database := client.Database(os.Getenv("MONGO_DATABASE"))
 
-	defer func() {
-		if err = client.Disconnect(ctx); err != nil {
-			log.Fatalf("DB disconnect failed: %v", err)
-		}
-	}()
-
-	// arliai setup
-	arliai := ai.InitializeArliaiConfig(os.Getenv("ARLIAI_API_KEY"))
-
-	// console run
-	if err = console.Run(database, arliai); err != nil {
-		log.Fatalf("Run error: %v", err)
-	}
+	return client, database
 }

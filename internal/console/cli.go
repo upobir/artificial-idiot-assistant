@@ -3,23 +3,15 @@ package console
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/upobir/artificial-idiot-assistant/internal/ai"
 	"github.com/upobir/artificial-idiot-assistant/internal/assistant"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
-func Run(database *mongo.Database, arliai *ai.Arliai) error {
+func Run(astnt *assistant.Assistant) error {
 	reader := bufio.NewReader(os.Stdin)
-
-	assistant, err := assistant.NewAssistant("Llama-3.1-8B-Fireplace2", false)
-	if err != nil {
-		return err
-	}
 
 	for {
 		fmt.Print("you > ")
@@ -32,17 +24,26 @@ func Run(database *mongo.Database, arliai *ai.Arliai) error {
 			break
 		}
 
-		assistant.AddUserMessage(input)
-		msg, err := assistant.FetchAssistantMessage(arliai, database)
-		if err != nil {
-			log.Fatalf("chat completion: %v\n", err)
+		astnt.AddUserMessage(input)
+
+		fmt.Printf("aia > ")
+		for part := range astnt.FetchAssistantMessage() {
+			if part.Err != nil {
+				return part.Err
+			}
+
+			if part.Kind == assistant.Action {
+				fmt.Printf("%s \naia > ", part.Content)
+			} else if part.Kind == assistant.MessagePart {
+				output := strings.ReplaceAll(part.Content, "\n", "\n    ")
+				fmt.Printf("%s", output)
+			} else {
+				return fmt.Errorf("unknown repsonse kind: %v", part.Kind)
+			}
 		}
-
-		output := strings.ReplaceAll(msg, "\n", "\n    ")
-
+		fmt.Println()
 		endTime := time.Now()
-		fmt.Printf("aia > %s\n", output)
-		fmt.Printf("(%v seconds)\n", endTime.Sub(startTime).Seconds())
+		fmt.Printf("(%0.3f seconds)\n", endTime.Sub(startTime).Seconds())
 		fmt.Println()
 	}
 
