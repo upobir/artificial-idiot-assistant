@@ -1,13 +1,10 @@
 package ai
 
 import (
-	"bufio"
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
+
+	"github.com/upobir/artificial-idiot-assistant/internal/utils"
 )
 
 type ArliaiStreamingApi struct {
@@ -37,7 +34,7 @@ func (arliai *ArliaiStreamingApi) ChatComplete(conv *Conversation) <-chan ChatPa
 
 	go func() {
 		defer close(ch)
-		payload, err := json.Marshal(arliaiConversation{
+		payload := arliaiConversation{
 			Model:             arliai.model,
 			Messages:          mapMessages(conv.Messages),
 			RepetitionPenalty: 1.1,
@@ -46,71 +43,27 @@ func (arliai *ArliaiStreamingApi) ChatComplete(conv *Conversation) <-chan ChatPa
 			TopK:              40,
 			MaxTokens:         300,
 			Stream:            true,
+		}
+
+		err := utils.PostJsonAndConsumeSse(arliai.url, arliai.apiKey, payload, arliai.client, &arliaiStreamingResponse{}, func(chunk any) error {
+			response := chunk.(*arliaiStreamingResponse)
+
+			if len(response.Choices) != 1 {
+				return fmt.Errorf("length mismatch with response choices: %v", response)
+			}
+
+			if response.Choices[0].Delta.Role != "assistant" && response.Choices[0].Delta.Role != "" {
+				return fmt.Errorf("unexpected role: %v", response)
+			}
+
+			ch <- ChatPart{Value: response.Choices[0].Delta.Content, Err: nil}
+			response.Choices = nil
+
+			return nil
 		})
 		if err != nil {
 			ch <- ChatPart{Value: "", Err: err}
 			return
-		}
-
-		req, err := http.NewRequest("POST", arliai.url, bytes.NewBuffer(payload))
-		if err != nil {
-			ch <- ChatPart{Value: "", Err: err}
-			return
-		}
-
-		req.Header.Set("Authorization", "Bearer "+arliai.apiKey)
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := arliai.client.Do(req)
-		if err != nil {
-			ch <- ChatPart{Value: "", Err: err}
-			return
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			body, _ := io.ReadAll(resp.Body)
-			ch <- ChatPart{Value: "", Err: fmt.Errorf("failed request, status: %d, response: %v", resp.StatusCode, string(body))}
-			return
-		}
-
-		scanner := bufio.NewScanner(resp.Body)
-
-		for scanner.Scan() {
-			line := scanner.Text()
-
-			if len(line) == 0 {
-				continue
-			}
-
-			if !strings.HasPrefix(line, "data: ") {
-				ch <- ChatPart{Value: "", Err: fmt.Errorf("unexpected line: %s", line)}
-				return
-			}
-
-			line = strings.TrimPrefix(line, "data: ")
-
-			if line == "[DONE]" {
-				return
-			}
-
-			var result arliaiStreamingResponse
-			if err := json.Unmarshal([]byte(line), &result); err != nil {
-				ch <- ChatPart{Value: "", Err: err}
-				return
-			}
-
-			if len(result.Choices) != 1 {
-				ch <- ChatPart{Value: "", Err: fmt.Errorf("length mismatch with response choices: %v", result)}
-				return
-			}
-
-			if result.Choices[0].Delta.Role != "assistant" && result.Choices[0].Delta.Role != "" {
-				ch <- ChatPart{Value: "", Err: fmt.Errorf("unexpected role: %v", result)}
-				return
-			}
-
-			ch <- ChatPart{Value: result.Choices[0].Delta.Content, Err: nil}
 		}
 	}()
 

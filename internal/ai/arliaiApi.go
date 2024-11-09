@@ -1,11 +1,10 @@
 package ai
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+
+	"github.com/upobir/artificial-idiot-assistant/internal/utils"
 )
 
 type ArliaiApi struct {
@@ -67,7 +66,7 @@ func (arliai *ArliaiApi) ChatComplete(conv *Conversation) <-chan ChatPart {
 
 	go func() {
 		defer close(ch)
-		payload, err := json.Marshal(arliaiConversation{
+		paylod := arliaiConversation{
 			Model:             arliai.model,
 			Messages:          mapMessages(conv.Messages),
 			RepetitionPenalty: 1.1,
@@ -76,41 +75,10 @@ func (arliai *ArliaiApi) ChatComplete(conv *Conversation) <-chan ChatPart {
 			TopK:              40,
 			MaxTokens:         300,
 			Stream:            false,
-		})
-		if err != nil {
-			ch <- ChatPart{Value: "", Err: err}
-			return
 		}
-
-		req, err := http.NewRequest("POST", arliai.url, bytes.NewBuffer(payload))
-		if err != nil {
-			ch <- ChatPart{Value: "", Err: err}
-			return
-		}
-
-		req.Header.Set("Authorization", "Bearer "+arliai.apiKey)
-		req.Header.Set("Content-Type", "application/json")
-
-		resp, err := arliai.client.Do(req)
-		if err != nil {
-			ch <- ChatPart{Value: "", Err: err}
-			return
-		}
-		defer resp.Body.Close()
-
-		respBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			ch <- ChatPart{Value: "", Err: err}
-			return
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			ch <- ChatPart{Value: "", Err: fmt.Errorf("failed request, status: %d, response: %v", resp.StatusCode, respBody)}
-			return
-		}
-
 		var result arliaiResponse
-		if err := json.Unmarshal(respBody, &result); err != nil {
+		err := utils.PostJson(arliai.url, arliai.apiKey, paylod, arliai.client, &result)
+		if err != nil {
 			ch <- ChatPart{Value: "", Err: err}
 			return
 		}
