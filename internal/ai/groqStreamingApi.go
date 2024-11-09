@@ -7,39 +7,38 @@ import (
 	"github.com/upobir/artificial-idiot-assistant/internal/utils"
 )
 
-type ArliaiStreamingApi struct {
+type GroqStreamingApi struct {
 	url    string
 	apiKey string
 	client *http.Client
 	model  string
 }
 
-func InitializeArliaiStreamingApi(apiKey string, model string) *ArliaiStreamingApi {
-	return &ArliaiStreamingApi{
-		url:    "https://api.arliai.com/v1/chat/completions",
+func InitializeGroqStreamingApi(apiKey string, model string) *GroqStreamingApi {
+	return &GroqStreamingApi{
+		url:    "https://api.groq.com/openai/v1/chat/completions",
 		apiKey: apiKey,
 		client: &http.Client{},
 		model:  model,
 	}
 }
 
-func (arliai *ArliaiStreamingApi) ChatComplete(conv *Conversation) <-chan ChatPart {
+func (groqai *GroqStreamingApi) ChatComplete(conv *Conversation) <-chan ChatPart {
 	ch := make(chan ChatPart)
 
 	go func() {
 		defer close(ch)
-		payload := arliaiConversation{
-			Model:             arliai.model,
-			Messages:          mapMessages(conv.Messages),
-			RepetitionPenalty: 1.1,
-			Temperature:       0.5,
-			TopP:              0.9,
-			TopK:              40,
-			MaxTokens:         300,
-			Stream:            true,
+		payload := groqConversation{
+			Model:           groqai.model,
+			Messages:        mapMessages(conv.Messages),
+			PresencePenalty: 1.1,
+			Temperature:     0.5,
+			TopP:            0.9,
+			MaxTokens:       300,
+			Stream:          true,
 		}
 
-		err := utils.PostJsonAndConsumeSse(arliai.url, arliai.apiKey, payload, arliai.client, &apiStreamingResponse{}, func(chunk any) error {
+		err := utils.PostJsonAndConsumeSse(groqai.url, groqai.apiKey, payload, groqai.client, &apiStreamingResponse{}, func(chunk any) error {
 			response := chunk.(*apiStreamingResponse)
 
 			if len(response.Choices) != 1 {

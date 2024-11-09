@@ -45,7 +45,8 @@ func initializeAssistant(aiApi ai.AiApi, database *mongo.Database) *assistant.As
 
 func initializeAiApi() ai.AiApi {
 	// return ai.InitializeArliaiApi(os.Getenv("ARLIAI_API_KEY"), "Mistral-Nemo-12B-Instruct-2407")
-	return ai.InitializeArliaiStreamingApi(os.Getenv("ARLIAI_API_KEY"), "Mistral-Nemo-12B-Instruct-2407")
+	// return ai.InitializeArliaiStreamingApi(os.Getenv("ARLIAI_API_KEY"), "Mistral-Nemo-12B-Instruct-2407")
+	return ai.InitializeGroqStreamingApi(os.Getenv("GROQ_API_KEY"), "llama3-8b-8192")
 	// return ai.InitializeFakeApi(true, 100*time.Millisecond)
 }
 
