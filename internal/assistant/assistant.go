@@ -25,7 +25,6 @@ func NewAssistant(aiApi ai.AiApi, database *mongo.Database) (*Assistant, error) 
 	}
 
 	assistant := &Assistant{
-		// Conversation: ai.NewConversation("Mistral-Nemo-12B-Instruct-2407", false),
 		aiApi:        aiApi,
 		database:     database,
 		conversation: ai.NewConversation(),
@@ -83,7 +82,12 @@ func (assistant *Assistant) FetchAssistantMessage() <-chan ResponsePart {
 					return
 				}
 
-				builder.WriteString(part.Value)
+				value := part.Value
+				if builder.Len() == 0 {
+					value = strings.TrimLeft(value, " ")
+				}
+
+				builder.WriteString(value)
 
 				if kind == Unknown {
 					message := builder.String()
@@ -96,13 +100,13 @@ func (assistant *Assistant) FetchAssistantMessage() <-chan ResponsePart {
 						ch <- ResponsePart{Kind: kind, Content: "Working...", Err: nil}
 					}
 				} else if kind == MessagePart {
-					ch <- ResponsePart{Kind: kind, Content: part.Value, Err: nil}
+					ch <- ResponsePart{Kind: kind, Content: value, Err: nil}
 				} else if kind == Action {
 				}
 			}
 
 			if kind == Unknown {
-				ch <- ResponsePart{Kind: Unknown, Content: "", Err: fmt.Errorf("failed to parse: %v", builder.String())}
+				ch <- ResponsePart{Kind: Unknown, Content: "", Err: fmt.Errorf("failed to parse: '%v'", builder.String())}
 				return
 			} else if kind == Action {
 				response, err := assistant.handleFunctionCall(strings.TrimSpace(strings.TrimPrefix(builder.String(), "TO-SERVICE: ")))
