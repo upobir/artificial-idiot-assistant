@@ -8,3 +8,8 @@ type ChatPart struct {
 type AiApi interface {
 	ChatComplete(conv *Conversation) <-chan ChatPart
 }
+
+type loggableAiApi interface {
+	AiApi
+	Metadata() map[string]any
+}

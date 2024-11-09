@@ -8,12 +8,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-func GetNextTaskId(database *mongo.Database) (int, error) {
+func GetNextId(database *mongo.Database, kind string) (int, error) {
 	collection := database.Collection("sequences")
 	var result struct {
 		Value int `bson:"value"`
 	}
-	filter := bson.M{"_id": "tasks"}
+	filter := bson.M{"_id": kind}
 	update := bson.M{"$inc": bson.M{"value": 1}}
 	opts := options.FindOneAndUpdate().SetUpsert(true).SetReturnDocument(options.After)
 

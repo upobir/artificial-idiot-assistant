@@ -7,6 +7,9 @@ import (
 	"github.com/upobir/artificial-idiot-assistant/internal/utils"
 )
 
+const MAX_TOKENS = 300
+const TEMPERATURE = 0.5
+
 type GroqStreamingApi struct {
 	url    string
 	apiKey string
@@ -32,9 +35,9 @@ func (groqai *GroqStreamingApi) ChatComplete(conv *Conversation) <-chan ChatPart
 			Model:           groqai.model,
 			Messages:        mapMessages(conv.Messages),
 			PresencePenalty: 1.1,
-			Temperature:     0.5,
+			Temperature:     TEMPERATURE,
 			TopP:            0.9,
-			MaxTokens:       300,
+			MaxTokens:       MAX_TOKENS,
 			Stream:          true,
 		}
 
@@ -61,4 +64,14 @@ func (groqai *GroqStreamingApi) ChatComplete(conv *Conversation) <-chan ChatPart
 	}()
 
 	return ch
+}
+
+func (groqai *GroqStreamingApi) Metadata() map[string]any {
+	return map[string]any{
+		"apiName":     "groq",
+		"stream":      true,
+		"model":       groqai.model,
+		"maxTokens":   MAX_TOKENS,
+		"temperature": TEMPERATURE,
+	}
 }

@@ -83,9 +83,6 @@ func (assistant *Assistant) FetchAssistantMessage() <-chan ResponsePart {
 				}
 
 				value := part.Value
-				if builder.Len() == 0 {
-					value = strings.TrimLeft(value, " ")
-				}
 
 				builder.WriteString(value)
 
@@ -104,6 +101,7 @@ func (assistant *Assistant) FetchAssistantMessage() <-chan ResponsePart {
 				} else if kind == Action {
 				}
 			}
+			assistant.conversation.AddMessage(ai.Ai, builder.String())
 
 			if kind == Unknown {
 				ch <- ResponsePart{Kind: Unknown, Content: "", Err: fmt.Errorf("failed to parse: '%v'", builder.String())}

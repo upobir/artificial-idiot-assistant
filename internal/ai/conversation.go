@@ -13,6 +13,7 @@ type Message struct {
 	Content string
 }
 
+// Raw Conversation
 type Conversation struct {
 	Messages []Message
 }

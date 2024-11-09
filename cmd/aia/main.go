@@ -26,7 +26,7 @@ func main() {
 	client, database := initializeMongo(ctx)
 	defer client.Disconnect(ctx)
 
-	aiApi := initializeAiApi()
+	aiApi := initializeAiApi(database)
 
 	assistant := initializeAssistant(aiApi, database)
 
@@ -43,11 +43,12 @@ func initializeAssistant(aiApi ai.AiApi, database *mongo.Database) *assistant.As
 	return assistant
 }
 
-func initializeAiApi() ai.AiApi {
+func initializeAiApi(database *mongo.Database) ai.AiApi {
 	// return ai.InitializeArliaiApi(os.Getenv("ARLIAI_API_KEY"), "Mistral-Nemo-12B-Instruct-2407")
 	// return ai.InitializeArliaiStreamingApi(os.Getenv("ARLIAI_API_KEY"), "Mistral-Nemo-12B-Instruct-2407")
-	return ai.InitializeGroqStreamingApi(os.Getenv("GROQ_API_KEY"), "llama3-8b-8192")
-	// return ai.InitializeFakeApi(true, 100*time.Millisecond)
+	aiApi := ai.InitializeGroqStreamingApi(os.Getenv("GROQ_API_KEY"), "llama3-8b-8192")
+	// aiApi := ai.InitializeFakeApi(true, 100*time.Millisecond)
+	return ai.InitializeLoggedAiApi(aiApi, database)
 }
 
 func initializeEnv() {

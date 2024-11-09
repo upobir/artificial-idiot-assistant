@@ -14,10 +14,15 @@ type FakeApi struct {
 
 func InitializeFakeApi(stream bool, delay time.Duration) *FakeApi {
 	return &FakeApi{
-		responses: []string{"TO-USER: Hello", "TO-USER: How can I help you", "TO-USER: Goodbye", "TO-SERVICE: getTasks"},
-		rng:       rand.New(rand.NewSource(time.Now().UnixNano())),
-		stream:    stream,
-		delay:     delay,
+		responses: []string{
+			"TO-USER: Hello",
+			"TO-USER: How can I help you",
+			"TO-USER: Goodbye",
+			"TO-SERVICE: getTasks",
+		},
+		rng:    rand.New(rand.NewSource(time.Now().UnixNano())),
+		stream: stream,
+		delay:  delay,
 	}
 }
 
@@ -38,4 +43,12 @@ func (fakeApi *FakeApi) ChatComplete(conv *Conversation) <-chan ChatPart {
 
 	}()
 	return ch
+}
+
+func (fakeapi *FakeApi) Metadata() map[string]any {
+	return map[string]any{
+		"apiName": "fake",
+		"delay":   fakeapi.delay.Milliseconds(),
+		"stream":  fakeapi.stream,
+	}
 }

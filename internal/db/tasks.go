@@ -28,7 +28,7 @@ func GetAllTasks(database *mongo.Database) ([]task.Task, error) {
 func InsertTask(database *mongo.Database, task task.Task) (task.Task, error) {
 	collection := database.Collection(TASK_COLLECTION_NAME)
 
-	nextID, err := GetNextTaskId(database)
+	nextID, err := GetNextId(database, "tasks")
 	if err != nil {
 		return task, err
 	}
